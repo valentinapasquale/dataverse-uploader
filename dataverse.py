@@ -14,7 +14,7 @@ def parse_arguments():
     parser.add_argument("token", help="Dataverse token.")
     parser.add_argument("server", help="Dataverse server.")
     parser.add_argument("doi", help="Dataset DOI.")
-    parser.add_argument("repo", help="GitHub repository.")
+    parser.add_argument("repo", help="GitHub/GitLab repository.")
 
     # Optional arguments
     parser.add_argument("-d", "--dir", help="Uploads only a specific dir.")
@@ -24,6 +24,10 @@ def parse_arguments():
         default='true')
     parser.add_argument(
         "-p", "--publish", help="Publish a new dataset version after upload.", \
+        choices=('True', 'TRUE', 'true', 'False', 'FALSE', 'false'), \
+        default='false')
+    parser.add_argument(
+        "-gl", "--gitlab", help="Use GitLab repository.", \
         choices=('True', 'TRUE', 'true', 'False', 'FALSE', 'false'), \
         default='false')
 
@@ -72,21 +76,34 @@ if __name__ == '__main__':
                 auth = (token  , ""))
 
     # the following adds all files from the repository to Dataverse
-    path = join('repo',args.dir) if args.dir else 'repo'
-
+    if args.gitlab.lower() == 'true':
+        path = join('../')
+    else:
+        path = join('repo', args.dir) if args.dir else 'repo'
+    
     for root, subdirs, files in walk(path):
         if '.git' in subdirs:
             subdirs.remove('.git')
         if '.github' in subdirs:
             subdirs.remove('.github')
+        if args.gitlab.lower() == 'true' and 'dataverse-uploader' in subdirs:
+            subdirs.remove('dataverse-uploader')           
+        if args.gitlab.lower() == 'true':
+            description = "Uploaded with GitLab from {}."
+        else:
+            description = "Uploaded with GitHub Action from {}."
+            
         for f in files:
+            if args.gitlab.lower() == 'true' and f == '.gitlab-ci.yml':
+                continue
+            print('Uploading ' + f + '\n')
             df = Datafile()
             df.set({
                 "pid" : args.doi,
                 "filename" : f,
                 "directoryLabel": root[5:],
                 "description" : \
-                  "Uploaded with GitHub Action from {}.".format(
+                  description.format(
                     args.repo),
                 })
             resp = api.upload_datafile(
